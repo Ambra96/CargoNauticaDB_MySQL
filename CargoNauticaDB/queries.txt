@@ -1,0 +1,77 @@
+-- 1) How many supervisors are over 35 years old?
+SELECT COUNT(supervisor.supv_id) AS 'Supervisors Over 35'
+FROM supervisor
+JOIN employee ON supervisor.supv_id = employee.emp_id
+WHERE emp_birthdate <= '1989-12-31'
+  AND supv_end_dt IS NULL;
+
+-- 2) How many ships are older than 15 years?
+SELECT COUNT(ship.ship_id) AS 'Ships Older Than 15 Years'
+FROM ship
+WHERE ship_shipping_dt <= '2009-12-31';
+
+-- 3) How many captains live in the same city?
+SELECT employee.emp_city, COUNT(*) AS 'Captains Per City'
+FROM employee
+JOIN emp_allocation ON employee.emp_id = emp_allocation.empalloc_emp_id
+JOIN staff ON employee.emp_id = staff.emp_id
+JOIN position ON staff.stf_position = position.pos_id
+WHERE position.pos_name = 'captain'
+  AND emp_allocation.empalloc_end_dt IS NULL
+GROUP BY employee.emp_city;
+
+-- 4) Which Chief Engineer had the most level-1 damages?
+SELECT staff.emp_id, position.pos_name, dmglevel.dmgl_id, COUNT(*) AS 'Incidents'
+FROM staff
+JOIN position ON staff.stf_position = position.pos_id
+JOIN staff_traveling ON staff.emp_id = staff_traveling.stftrv_emp_id
+JOIN travel ON staff_traveling.stftrv_trv_id = travel.trv_id
+JOIN ship_traveling ON travel.trv_id = ship_traveling.shiptrv_trv_id
+JOIN ship ON ship_traveling.shiptrv_ship_id = ship.ship_id
+JOIN damage ON ship.ship_id = damage.dmg_ship_id
+JOIN dmglevel ON damage.dmg_level = dmglevel.dmgl_id
+WHERE dmglevel.dmgl_id = 1
+  AND position.pos_name = 'chief engineer'
+GROUP BY staff.emp_id, position.pos_name, dmglevel.dmgl_id
+ORDER BY COUNT(*) DESC;
+
+-- 5) Which captains have passports expiring in the next 6 months?
+SELECT employee.emp_id, employee.emp_name, employee.emp_surname,
+       staff.stf_pass_expiration_dt, position.pos_name AS 'Position'
+FROM employee
+JOIN staff ON employee.emp_id = staff.emp_id
+JOIN position ON staff.stf_position = position.pos_id
+WHERE position.pos_name = 'captain'
+  AND stf_pass_expiration_dt BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 6 MONTH);
+
+-- 6) Which employee has the most children?
+SELECT employee.emp_id, employee.emp_name, COUNT(*) AS 'Children'
+FROM employee
+JOIN family ON employee.emp_id = family.fml_emp_id
+JOIN relation ON family.fml_relation = relation.rel_id
+WHERE rel_name IN ('son', 'daughter')
+GROUP BY employee.emp_id, employee.emp_name
+ORDER BY COUNT(*) DESC
+LIMIT 1;
+
+-- 7) Which employee changed departments the most?
+SELECT employee.emp_id, employee.emp_name,
+       COUNT(emp_allocation.empalloc_id) AS 'Department Changes'
+FROM employee
+JOIN emp_allocation ON emp_allocation.empalloc_emp_id = employee.emp_id
+GROUP BY employee.emp_id, employee.emp_name
+ORDER BY COUNT(emp_allocation.empalloc_id) DESC
+LIMIT 1;
+
+-- 8) Which ship had the most delays?
+SELECT ship.ship_id, ship.ship_name,
+       COUNT(ship.ship_id) AS 'Delays'
+FROM ship
+JOIN ship_traveling ON ship.ship_id = ship_traveling.shiptrv_ship_id
+WHERE ship_traveling.shiptrv_edd < ship_traveling.shiptrv_add
+   OR ship_traveling.shiptrv_eda < ship_traveling.shiptrv_ada
+   OR ship_traveling.shiptrv_etd < ship_traveling.shiptrv_atd
+   OR ship_traveling.shiptrv_eta < ship_traveling.shiptrv_ata
+GROUP BY ship.ship_id, ship.ship_name
+ORDER BY COUNT(ship.ship_id) DESC
+LIMIT 1;
